@@ -4,9 +4,6 @@ name: Sync Code Connect
 # the changed .tsx files, compares props against the matching .figma.ts
 # under demo/src/figma/, and, if there is drift, opens a stacked PR that
 # updates the Code Connect files.
-#
-# The sync PR targets the source PR's head branch so both changes ship
-# together and can be reviewed by the design-system team independently.
 
 on:
   pull_request:
@@ -20,7 +17,6 @@ concurrency:
 
 jobs:
   sync:
-    # Skip when the trigger is the sync bot's own PR (avoids self-loops).
     if: ${{ !startsWith(github.event.pull_request.head.ref, 'sync-cc/') }}
     runs-on: ubuntu-latest
     permissions:
@@ -33,8 +29,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          # Submodules aren't needed for Code Connect sync — skip to keep
-          # the job fast and avoid pulling ~500MB of sds/ content.
           submodules: false
 
       - name: Set up Node
@@ -55,22 +49,19 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: printenv OPENAI_API_KEY | codex login --with-api-key
 
-      - name: Run Codex to sync .figma.ts
+      - name: Write prompt to file
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.ref }}
           PR_BASE: ${{ github.event.pull_request.base.ref }}
+        # NOTE: single-quoted heredoc keeps backticks and $VARS literal
+        # so bash does NOT execute the code snippets embedded in the
+        # prompt. We rely on Codex to interpret them itself.
         run: |
-          codex exec \
-            --dangerously-bypass-approvals-and-sandbox \
-            -C "$GITHUB_WORKSPACE" \
-            --json \
-            -o /tmp/codex-last-message.txt \
-            "$(cat <<PROMPT
-          You are running in GitHub Actions on pull request #${PR_NUMBER}
-          (head branch: ${PR_HEAD}, base branch: ${PR_BASE}).
+          mkdir -p /tmp/codex
+          cat > /tmp/codex/prompt.txt <<'PROMPT'
+          You are running in GitHub Actions on pull request #__PR_NUMBER__
+          (head branch: __PR_HEAD__, base branch: __PR_BASE__).
 
           ## Goal
 
@@ -82,60 +73,76 @@ jobs:
           ## Steps
 
           1. List the component files changed in this PR:
-             `git diff --name-only origin/${PR_BASE}...HEAD -- 'demo/src/ui/**/*.tsx'`
+             `git diff --name-only origin/__PR_BASE__...HEAD -- 'demo/src/ui/**/*.tsx'`
           2. For each changed component `.tsx`, find the matching template:
                - `demo/src/ui/compositions/ProductCard/ProductCard.tsx`
-                  → `demo/src/figma/ProductCard.figma.ts`
+                  -> `demo/src/figma/ProductCard.figma.ts`
                - `demo/src/ui/primitives/SizeChip/SizeChip.tsx`
-                  → `demo/src/figma/SizeChip.figma.ts`
+                  -> `demo/src/figma/SizeChip.figma.ts`
                - `demo/src/ui/compositions/SizeSelector/SizeSelector.tsx`
-                  → `demo/src/figma/SizeSelector.figma.ts`
-          3. Read both files. Compare the exported prop types against what
-             the `.figma.ts` maps via
-             `figma.selectedInstance.getString/getEnum/getBoolean` and the
-             JSX snippet inside the `figma.code` template literal. Detect
-             drift:
-               - Prop added → add a matching `getString/getEnum/getBoolean`
-                 binding (choose by TS type: `string` → getString, union of
-                 literals → getEnum, `boolean` → getBoolean, `number` →
-                 getString and cast in the snippet) and include it in the
-                 snippet.
-               - Prop removed → delete the binding and the snippet reference.
-               - Prop renamed → rename in both places.
-               - Enum union widened → add the new value to the `getEnum`
+                  -> `demo/src/figma/SizeSelector.figma.ts`
+          3. Read both files. Compare the exported prop types against
+             what the `.figma.ts` maps via
+             `figma.selectedInstance.getString / getEnum / getBoolean`
+             and the JSX snippet inside the `figma.code` template
+             literal. Detect drift:
+               - Prop added: add a matching `getString / getEnum /
+                 getBoolean` binding (choose by TS type: `string` ->
+                 getString, union of literals -> getEnum, `boolean` ->
+                 getBoolean, `number` -> getString and cast in the
+                 snippet) and include it in the snippet.
+               - Prop removed: delete the binding and the snippet
+                 reference.
+               - Prop renamed: rename in both places.
+               - Enum union widened: add the new value to the `getEnum`
                  options map.
-             Assume the Figma property name matches the code prop name in
-             PascalCase (e.g. `rating` → `"Rating"`).
+             Assume the Figma property name matches the code prop name
+             in PascalCase (e.g. `rating` -> "Rating").
           4. Run `git status --short demo/src/figma/` to confirm what
              changed.
-          5. If nothing changed: print `no drift — exiting` and stop.
+          5. If nothing changed: print "no drift, exiting" and stop.
           6. If `.figma.ts` files changed:
-             a. `git checkout -b sync-cc/${PR_HEAD}` (or `-B` if the branch
-                already exists on origin).
+             a. `git checkout -b sync-cc/__PR_HEAD__` (or `-B` if the
+                branch already exists on origin).
              b. `git add demo/src/figma/`
-             c. `git commit -m "chore(code-connect): sync .figma.ts for PR #${PR_NUMBER}"`
-             d. `git push -u origin sync-cc/${PR_HEAD}` (append
+             c. `git commit -m "chore(code-connect): sync .figma.ts for PR #__PR_NUMBER__"`
+             d. `git push -u origin sync-cc/__PR_HEAD__` (append
                 `--force-with-lease` if reusing an existing branch).
              e. Check for an existing sync PR with
-                `gh pr list --head sync-cc/${PR_HEAD} --json number`.
+                `gh pr list --head sync-cc/__PR_HEAD__ --json number`.
                 If none exists, create one:
                   gh pr create \
-                    --base ${PR_HEAD} \
-                    --head sync-cc/${PR_HEAD} \
-                    --title "chore(code-connect): sync for #${PR_NUMBER}" \
-                    --body "Auto-generated by the sync-code-connect workflow. Syncs the .figma.ts template files under demo/src/figma/ to match the component prop changes in #${PR_NUMBER}. Review the diff, then merge this PR before merging #${PR_NUMBER}."
-             f. Comment on the source PR once (only if no comment exists):
-                  gh pr comment ${PR_NUMBER} --body "🤖 Code Connect sync PR opened: <URL>"
+                    --base __PR_HEAD__ \
+                    --head sync-cc/__PR_HEAD__ \
+                    --title "chore(code-connect): sync for #__PR_NUMBER__" \
+                    --body "Auto-generated by the sync-code-connect workflow. Syncs the .figma.ts template files under demo/src/figma/ to match the component prop changes in #__PR_NUMBER__. Review the diff, then merge this PR before merging #__PR_NUMBER__."
+             f. Comment on the source PR once (only if no comment
+                exists):
+                  gh pr comment __PR_NUMBER__ --body "🤖 Code Connect sync PR opened: <URL>"
 
           ## Constraints
 
-          - Only touch files under `demo/src/figma/`. Do not edit component
-            sources, `package.json`, or any other file.
+          - Only touch files under `demo/src/figma/`. Do not edit
+            component sources, `package.json`, or any other file.
           - Do not install packages or run tests.
           - Do not open more than one sync PR per source PR.
           - Never push directly to the source PR's branch.
           PROMPT
-          )"
+          # Substitute env vars into placeholders (safe: no backtick eval)
+          sed -i "s|__PR_NUMBER__|${PR_NUMBER}|g" /tmp/codex/prompt.txt
+          sed -i "s|__PR_HEAD__|${PR_HEAD}|g" /tmp/codex/prompt.txt
+          sed -i "s|__PR_BASE__|${PR_BASE}|g" /tmp/codex/prompt.txt
+
+      - name: Run Codex to sync .figma.ts
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          codex exec \
+            --dangerously-bypass-approvals-and-sandbox \
+            -C "$GITHUB_WORKSPACE" \
+            -o /tmp/codex-last-message.txt \
+            - < /tmp/codex/prompt.txt
 
       - name: Show Codex last message
         if: always()
