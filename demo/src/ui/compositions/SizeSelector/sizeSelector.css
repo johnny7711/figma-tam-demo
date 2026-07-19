@@ -1,0 +1,9 @@
+.size-selector-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sds-size-space-200);
+}
+
+.size-selector-grid > * {
+  flex: 0 0 auto;
+}

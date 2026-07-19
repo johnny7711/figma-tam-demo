@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["@figma/code-connect/figma-types", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "compositions": ["../sds/src/ui/compositions"],
+      "data": ["../sds/src/data"],
+      "hooks": ["../sds/src/ui/hooks"],
+      "icons": ["../sds/src/ui/icons"],
+      "images": ["../sds/src/ui/images"],
+      "layout": ["../sds/src/ui/layout"],
+      "primitives": ["../sds/src/ui/primitives"],
+      "utils": ["../sds/src/ui/utils"],
+      "@demo/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

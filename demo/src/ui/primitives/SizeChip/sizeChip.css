@@ -1,0 +1,38 @@
+.size-chip {
+  min-width: 3.5rem;
+  padding: var(--sds-size-space-200) var(--sds-size-space-300);
+  border-radius: var(--sds-size-radius-200);
+  border: var(--sds-size-stroke-border) solid
+    var(--sds-color-border-default-default);
+  background: var(--sds-color-background-default-default);
+  color: var(--sds-color-text-default-default);
+  font-family: inherit;
+  font-size: var(--sds-font-size-100);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.size-chip:hover:not(:disabled) {
+  border-color: var(--sds-color-border-default-tertiary);
+}
+
+.size-chip:focus-visible {
+  outline: var(--sds-size-stroke-focus-ring) solid
+    var(--global-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.size-chip-selected {
+  background: var(--sds-color-background-brand-default);
+  color: var(--sds-color-text-brand-on-brand);
+  border-color: var(--sds-color-border-brand-default);
+}
+
+.size-chip-sold-out {
+  color: var(--sds-color-text-default-tertiary);
+  background: var(--sds-color-background-neutral-tertiary);
+  border-color: transparent;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}

@@ -1,0 +1,58 @@
+.pdp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sds-size-space-800);
+}
+
+@media (max-width: 900px) {
+  .pdp-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pdp-media {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--sds-size-radius-400);
+  background: var(--sds-color-background-neutral-tertiary);
+}
+
+.pdp-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pdp-back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sds-color-text-default-secondary);
+  padding: var(--sds-size-space-100) 0;
+  font: inherit;
+  align-self: flex-start;
+}
+
+.pdp-back:hover {
+  color: var(--sds-color-text-default-default);
+}
+
+.pdp-recommendations {
+  border-top: var(--sds-size-stroke-border) solid
+    var(--sds-color-border-default-default);
+  padding-top: var(--sds-size-space-800);
+  margin-top: var(--sds-size-space-400);
+}
+
+.pdp-recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sds-size-space-600);
+}
+
+@media (max-width: 900px) {
+  .pdp-recommendations-grid {
+    grid-template-columns: 1fr;
+  }
+}

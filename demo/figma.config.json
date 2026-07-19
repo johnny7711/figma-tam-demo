@@ -1,0 +1,15 @@
+{
+  "codeConnect": {
+    "parser": "react",
+    "include": ["src/figma/**/*.figma.ts"],
+    "importPaths": {
+      "src/ui/compositions/**/*": "@demo/ui/compositions",
+      "src/ui/primitives/**/*": "@demo/ui/primitives"
+    },
+    "documentUrlSubstitutions": {
+      "<FIGMA_PRODUCT_CARD>": "https://www.figma.com/design/0i6zwcTEIIePCADDL5fDTZ/DEMO_prep?node-id=12-325",
+      "<FIGMA_SIZE_CHIP>": "https://www.figma.com/design/0i6zwcTEIIePCADDL5fDTZ/DEMO_prep?node-id=11-25",
+      "<FIGMA_SIZE_SELECTOR>": "https://www.figma.com/design/0i6zwcTEIIePCADDL5fDTZ/DEMO_prep?node-id=13-25"
+    }
+  }
+}
