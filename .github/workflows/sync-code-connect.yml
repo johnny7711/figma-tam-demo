@@ -119,4 +119,5 @@ jobs:
             - Never push directly to the source PR's branch.
           claude_args: |
             --max-turns 20
+            --model claude-sonnet-4-5
             --allowedTools Bash(git:*),Bash(gh:*),Bash(cat:*),Bash(ls:*),Read,Edit,Write,Grep,Glob
