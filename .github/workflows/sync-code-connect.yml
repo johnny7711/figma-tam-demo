@@ -1,0 +1,121 @@
+name: Sync Code Connect
+
+# Fires on PRs that touch demo component sources. Claude Code reads the
+# changed .tsx files, compares props against the matching .figma.ts under
+# demo/src/figma/, and, if there is drift, opens a stacked PR that updates
+# the Code Connect files.
+#
+# The sync PR targets the source PR's head branch so both changes ship
+# together and can be reviewed by the design-system team independently.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "demo/src/ui/**/*.tsx"
+
+concurrency:
+  group: sync-cc-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Skip when the trigger is Claude's own sync PR (avoids self-loops).
+    if: ${{ !startsWith(github.event.pull_request.head.ref, 'sync-cc/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          # Submodules aren't needed for Code Connect sync — skip to keep the
+          # job fast and avoid pulling ~500MB of sds/ content.
+          submodules: false
+
+      - name: Configure git identity for Claude commits
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code@users.noreply.github.com"
+
+      - name: Run Claude Code to sync .figma.ts
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are running in GitHub Actions on pull request
+            #${{ github.event.pull_request.number }}
+            (head branch: `${{ github.event.pull_request.head.ref }}`,
+             base branch: `${{ github.event.pull_request.base.ref }}`).
+
+            ## Goal
+
+            Keep the Code Connect template files under `demo/src/figma/`
+            aligned with the React component props defined under
+            `demo/src/ui/`. Only edit `.figma.ts` files — never edit the
+            component source.
+
+            ## Steps
+
+            1. Get the list of component files changed in this PR:
+               `git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD -- 'demo/src/ui/**/*.tsx'`
+            2. For each changed component `.tsx`, find the matching template:
+                 - `demo/src/ui/compositions/ProductCard/ProductCard.tsx`
+                    → `demo/src/figma/ProductCard.figma.ts`
+                 - `demo/src/ui/primitives/SizeChip/SizeChip.tsx`
+                    → `demo/src/figma/SizeChip.figma.ts`
+                 - `demo/src/ui/compositions/SizeSelector/SizeSelector.tsx`
+                    → `demo/src/figma/SizeSelector.figma.ts`
+            3. Read both files. Compare the component's exported prop types
+               against what the `.figma.ts` maps via
+               `figma.selectedInstance.getString/getEnum/getBoolean` and the
+               JSX snippet inside `figma.code` \` … \`. Detect drift:
+                 - Prop added → add matching `getString/getEnum/getBoolean`
+                   binding (choose based on the TS type: `string` → getString,
+                   union of literals → getEnum, `boolean` → getBoolean) and
+                   include it in the snippet.
+                 - Prop removed → delete the binding and the snippet reference.
+                 - Prop renamed → rename in both places.
+                 - Enum union widened → add the new value to the `getEnum`
+                   options map.
+               Assume the Figma property name matches the code prop name in
+               PascalCase (e.g. `rating` → `"Rating"`). If unsure, keep the
+               existing convention already used in the file.
+            4. Save the edited `.figma.ts` files. Run
+               `git status --short demo/src/figma/` to confirm what changed.
+            5. If nothing changed: print `no drift — exiting` and stop.
+            6. If `.figma.ts` files changed:
+               a. Create a new branch:
+                  `git checkout -b sync-cc/${{ github.event.pull_request.head.ref }}`
+                  If the branch already exists on origin, reuse it with
+                  `git checkout -B` and force-push in step (d).
+               b. Stage only Code Connect files:
+                  `git add demo/src/figma/`
+               c. Commit:
+                  `git commit -m "chore(code-connect): sync .figma.ts for PR #${{ github.event.pull_request.number }}"`
+               d. Push:
+                  `git push -u origin sync-cc/${{ github.event.pull_request.head.ref }}`
+                  (append `--force-with-lease` if the branch already existed).
+               e. Open (or update) the sync PR:
+                  Check if a PR already exists with
+                  `gh pr list --head sync-cc/${{ github.event.pull_request.head.ref }} --json number`.
+                  If none exists, create:
+                  `gh pr create --base ${{ github.event.pull_request.head.ref }} --head sync-cc/${{ github.event.pull_request.head.ref }} --title "chore(code-connect): sync for #${{ github.event.pull_request.number }}" --body "Auto-generated by Claude Code in CI. Syncs the .figma.ts template files under demo/src/figma/ to match the component prop changes in #${{ github.event.pull_request.number }}. Review the diff, then merge this PR before merging #${{ github.event.pull_request.number }}."`
+               f. Comment on the source PR once, only if a comment doesn't
+                  already exist:
+                  `gh pr comment ${{ github.event.pull_request.number }} --body "🤖 Code Connect sync PR opened: <URL of new PR>"`
+
+            ## Constraints
+
+            - Only touch files under `demo/src/figma/`. Do not edit component
+              sources, package.json, or any other file.
+            - Do not install packages or run tests.
+            - Do not open more than one sync PR per source PR.
+            - Never push directly to the source PR's branch.
+          claude_args: |
+            --max-turns 20
+            --allowedTools Bash(git:*),Bash(gh:*),Bash(cat:*),Bash(ls:*),Read,Edit,Write,Grep,Glob
