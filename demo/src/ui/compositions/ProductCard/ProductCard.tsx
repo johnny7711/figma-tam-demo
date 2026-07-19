@@ -10,6 +10,7 @@ export type ProductCardProps = {
   price: string;
   imageUrl: string;
   badge?: ProductCardBadge;
+  rating?: number;
   onAddToBag?: () => void;
   onOpen?: () => void;
 };
@@ -29,6 +30,7 @@ export function ProductCard({
   price,
   imageUrl,
   badge = "None",
+  rating,
   onAddToBag,
   onOpen,
 }: ProductCardProps) {
@@ -48,6 +50,11 @@ export function ProductCard({
       <Flex direction="column" gap="100" style={{ padding: "var(--sds-size-space-400)" }}>
         <Text>{category}</Text>
         <TextSubheading lineClamp={1}>{name}</TextSubheading>
+        {rating !== undefined && (
+          <span className="product-card-rating" aria-label={`Rating ${rating} out of 5`}>
+            ★ {rating.toFixed(1)}
+          </span>
+        )}
         <TextStrong>¥{price}</TextStrong>
         <div className="product-card-cta">
           <Button

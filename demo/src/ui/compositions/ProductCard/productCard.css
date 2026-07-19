@@ -41,6 +41,13 @@
   left: var(--sds-size-space-300);
 }
 
+.product-card-rating {
+  color: #b8860b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
 .product-card-cta {
   margin-top: var(--sds-size-space-300);
   width: 100%;
