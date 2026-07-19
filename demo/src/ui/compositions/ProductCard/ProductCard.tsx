@@ -1,5 +1,6 @@
 import { Flex } from "layout";
 import { Button, Tag, Text, TextStrong, TextSubheading } from "primitives";
+
 import "./productCard.css";
 
 export type ProductCardBadge = "None" | "New" | "Sale" | "Sold out";
