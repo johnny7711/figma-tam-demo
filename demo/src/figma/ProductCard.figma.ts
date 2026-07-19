@@ -8,6 +8,7 @@ import figma from "figma";
 const name = figma.selectedInstance.getString("Name");
 const category = figma.selectedInstance.getString("Category");
 const price = figma.selectedInstance.getString("Price");
+const rating = figma.selectedInstance.getString("Rating");
 const badge = figma.selectedInstance.getEnum("Badge", {
   New: "New",
   Sale: "Sale",
@@ -29,6 +30,7 @@ export default {
   name="${name}"
   category="${category}"
   price="${price}"
+  rating={Number("${rating}")}
   badge="${badge}"
   imageUrl="/product.jpg"
   onAddToBag={() => {}}
